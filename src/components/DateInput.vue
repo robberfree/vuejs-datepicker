@@ -1,5 +1,5 @@
 <template>
-  <div :class="{'input-group' : bootstrapStyling}">
+  <div :class="{'input-group' : bootstrapStyling}" style="position:relative">
     <!-- Calendar Button -->
     <span v-if="calendarButton" class="vdp-datepicker__calendar-button" :class="{'input-group-prepend' : bootstrapStyling}" @click="showCalendar" v-bind:style="{'cursor:not-allowed;' : disabled}">
       <span :class="{'input-group-text' : bootstrapStyling}">
@@ -26,6 +26,7 @@
       @click="showCalendar"
       @keyup="parseTypedDate"
       @blur="inputBlurred"
+      maxlength="10"
       autocomplete="off">
     <!-- Clear Button -->
     <span v-if="clearButton && selectedDate" class="vdp-datepicker__clear-button" :class="{'input-group-append' : bootstrapStyling}" @click="clearDate()">
@@ -35,6 +36,9 @@
         </i>
       </span>
     </span>
+    <div style="position:absolute;left:0;top:0;height:100%;display:flex;align-items:center;padding:.75em .5em;pointer-events:none" v-if="typeable&&isSuggestion">
+      <span style="opacity:0">{{suggestion}}</span>&nbsp;<span style="opacity:0.5">{{suggestion2}}</span>
+    </div>
     <slot name="afterDateInput"></slot>
   </div>
 </template>
@@ -69,17 +73,24 @@ export default {
     return {
       input: null,
       typedDate: false,
-      utils: constructedDateUtils
+      utils: constructedDateUtils,
+      isSuggestion: true,
+      suggestion: '',
+      suggestion2: 'MM/DD/YYYY'
     }
   },
   computed: {
     formattedValue () {
+      // set suggestion default state
+      this.isSuggestion = true
       if (!this.selectedDate) {
         return null
       }
       if (this.typedDate) {
         return this.typedDate
       }
+      // don't show suggestion when pick a date
+      this.isSuggestion = false
       return typeof this.format === 'function'
         ? this.format(this.selectedDate)
         : this.utils.formatDate(new Date(this.selectedDate), this.format, this.translation)
@@ -104,6 +115,29 @@ export default {
     showCalendar () {
       this.$emit('showCalendar')
     },
+    getTypedDate (m, d, y) {
+      var _m = parseInt(m) || 1
+      var _d = parseInt(d) || 1
+      var _y = parseInt(y) || 2020
+      if (_m > 12) {
+        _m = 12
+      }
+      var maxDay = this.utils.daysInMonth(_m, _y)
+      if (_d > maxDay) {
+        _d = maxDay
+      }
+
+      var arr = [_m, _d, _y]
+      return {
+        real: arr.join('/'),
+        view: [m, d, y].filter(function (s) {
+          return s !== ''
+        }).map(function (s, index) {
+          // format m and d
+          return (index < 2 && parseInt(s) > arr[index]) ? arr[index] : s
+        }).join('/')
+      }
+    },
     /**
      * Attempt to parse a typed date
      * @param {Event} event
@@ -118,11 +152,28 @@ export default {
       }
 
       if (this.typeable) {
-        const typedDate = Date.parse(this.input.value)
-        if (!isNaN(typedDate)) {
-          this.typedDate = this.input.value
-          this.$emit('typedDate', new Date(this.typedDate))
+        // get input's number
+        var arr = this.input.value.split('').filter(function (char) {
+          return /\d/.test(char)
+        })
+        // get typedDate
+        var m = arr.splice(0, 2).join('')
+        var d = arr.splice(0, 2).join('')
+        var y = arr.splice(0, 4).join('')
+        var td = this.getTypedDate(m, d, y)
+
+        var value = td.view
+        this.suggestion = value
+        this.suggestion2 = 'MM/DD/YYYY'.substring(value.length)
+        this.input.value = value
+
+        if (this.input.value === '') {
+          this.input.blur()
+          return
         }
+
+        this.typedDate = value
+        this.$emit('typedDate', new Date(td.real))
       }
     },
     /**
