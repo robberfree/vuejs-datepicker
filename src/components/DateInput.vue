@@ -118,7 +118,19 @@ export default {
     getTypedDate (m, d, y) {
       var _m = parseInt(m) || 1
       var _d = parseInt(d) || 1
-      var _y = parseInt(y) || 2020
+
+      var _y = parseInt(y)
+      if (isNaN(_y)) {
+        _y = new Date().getFullYear()
+      } else {
+        if (y.length === 4) {
+          var year = new Date('01/01/' + y).getFullYear()
+          if (_y < year) {
+            y = _y = year
+          }
+        }
+      }
+
       if (_m > 12) {
         _m = 12
       }
@@ -133,8 +145,15 @@ export default {
         view: [m, d, y].filter(function (s) {
           return s !== ''
         }).map(function (s, index) {
-          // format m and d
-          return (index < 2 && parseInt(s) > arr[index]) ? arr[index] : s
+          // format mm and dd
+          if (index < 2) {
+            if (s === '00') {
+              return '01'
+            } else if (parseInt(s) > arr[index]) {
+              return arr[index]
+            }
+          }
+          return s
         }).join('/')
       }
     },
@@ -167,8 +186,9 @@ export default {
         this.suggestion2 = 'MM/DD/YYYY'.substring(value.length)
         this.input.value = value
 
-        if (this.input.value === '') {
-          this.input.blur()
+        if (value === '') {
+          this.clearDate()
+          this.typedDate = null
           return
         }
 
